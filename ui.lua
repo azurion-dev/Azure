@@ -149,20 +149,25 @@ local function screenSize()
     return cam and cam.ViewportSize or Vector2.new(1280, 720)
 end
 
-local function getGuiParent()
-    local ok, ui = pcall(function() return gethui and gethui() end)
-    if ok and typeof(ui) == "Instance" then return ui end
+local CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+local rng = Random.new()
 
-    ok, ui = pcall(function() return game:GetService("CoreGui") end)
-    if ok and ui then
-        local canUse = pcall(function()
-            local f = Instance.new("Folder")
-            f.Parent = ui
-            f:Destroy()
-        end)
-        if canUse then return ui end
+local function randomSegment(len)
+    local out = table.create(len)
+    for i = 1, len do
+        local n = rng:NextInteger(1, #CHARSET)
+        out[i] = string.sub(CHARSET, n, n)
     end
-    return LocalPlayer:WaitForChild("PlayerGui")
+    return table.concat(out)
+end
+
+-- "XXXXX-XXXXXX-XXXXX" (letras maiúsculas, minúsculas e números)
+local function randomGuiName()
+    return randomSegment(5) .. "-" .. randomSegment(6) .. "-" .. randomSegment(5)
+end
+
+local function getGuiParent()
+    return game:GetService("CoreGui")
 end
 
 local function isPress(input)
@@ -725,9 +730,9 @@ function Library:CreateWindow(opts)
         Window.FloatEnabled = true
     end
 
-    -- ScreenGui -------------------------------------------------------
+    -- ScreenGui (CoreGui, nome aleatório a cada 5s) ---------------
     local gui = new("ScreenGui", {
-        Name = "AzureUI",
+        Name = randomGuiName(),
         ResetOnSpawn = false,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
         IgnoreGuiInset = true,
@@ -736,6 +741,14 @@ function Library:CreateWindow(opts)
     pcall(function() if syn and syn.protect_gui then syn.protect_gui(gui) end end)
     gui.Parent = getGuiParent()
     Window.Gui = gui
+
+    task.spawn(function()
+        while not Window._destroyed and gui.Parent do
+            task.wait(5)
+            if Window._destroyed or not gui.Parent then break end
+            gui.Name = randomGuiName()
+        end
+    end)
 
     -- Adaptive size (PC / mobile) ---------------------------------
     local vp = screenSize()
